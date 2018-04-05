@@ -14,7 +14,7 @@ Table::Table(Header header, string name, set<vector<string>> &rows)
 	this->rows = rows;
 }
 
-void Table::addRow(vector<string> row)
+void Table::addRow(const vector<string> &row)
 {
 	rows.insert(row);
 }
@@ -115,7 +115,7 @@ Table Table::matchSelect(vector<pair<int, int>> matches) const
 					tempRows.erase(eraseIt);
 				}
 			}
-			
+
 	}
 	return Table(header, name, tempRows);
 }
@@ -149,17 +149,15 @@ Table Table::project(vector<int> projects) const
 		{
 			newHead.push_back(header[projects[i]]); //newHead is given col names from header.
 		}
-				
+
 		for (it = rows.begin(); it != rows.end(); it++)
 		{
-			bool add = true;
+
 			const vector<string> &temp = *it;
 			vector<string> newRow;
 			for (unsigned int k = 0; k < projects.size(); k++)
-			{
-				if (add == true) {
-					newRow.push_back(temp[projects[k]]);
-				}
+                        {
+                                newRow.push_back(temp[projects[k]]);
 			}
 			newRows.insert(newRow);
 		}
@@ -204,6 +202,7 @@ Table Table::ruleProject(vector<int> &projects) const //this also need to preser
 
                 for (unsigned int i= 0; i <projects.size(); i++)
                 {
+                        //cout << "p at i: " << projects[i];
                         newHead.push_back(header[projects[i]]); //newHead is given col names from header.
                 }
 
@@ -218,18 +217,6 @@ Table Table::ruleProject(vector<int> &projects) const //this also need to preser
                         newRows.insert(newRow);
                 }
 
-
-                /*for (it = rows.begin(); it != rows.end(); it++)
-                {
-                        const vector<string> &temp = *it;
-                        vector<string> newRow;
-                        for (intIt = projects.begin(); intIt != projects.end(); intIt++)
-                        {
-                            newRow.push_back(temp[*intIt]); //pull the int from k and inset into the newRow
-                        }
-                        newRows.insert(newRow);
-                        counter++;
-                }*/
                 if (projects.size() == 0) { //if nothing to project.. then just pass the whole thing
                         newHead = header;
                         newRows = rows;

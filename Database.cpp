@@ -27,7 +27,7 @@ steps for this
             Name='Snoopy'
         ncg('Snoopy',Course,Grade)? Yes(1)
             Course='CS101', Grade='C'
-        
+
 
 */
 
@@ -38,17 +38,28 @@ Database::Database(datalogProgram &datalog_program)
 	set<vector<string>> headers = datalog_program.getHeader();
 	set<vector<string>> rows = datalog_program.getRows();
 	vector<vector<string>> vecQueries = datalog_program.getQueries();
-        vector<rule> rules = datalog_program.getRules(); //fill rules to eval later
+  vector<rule> rules = datalog_program.getRules(); //fill rules to eval later
 
         fillDatabase(headers, rows, vecQueries); //builds the tables.
 
         cout << "Rule Evaluation \n";
-        set<Table> ruleTables = evalRules(rules);
-        //tables.insert(ruleTables.begin(), ruleTables.end()); // union table and rule Tables
-        tables = ruleTables;
+        int added =0;
 
-        //Run the Queries
-        for (unsigned int i = 0; i < vecQueries.size(); i++)   
+				do {
+					for(auto a: rules) //for each rule, eval it
+					{
+						rule rule_ = a;
+						evalRules(rule_, added);
+					}
+				} while(added != 0);
+
+        cout << endl << "Schemes populated after " << added <<" passes through the Rules.\n\n";
+        cout << "Query Evaluation" << endl;
+        //implement the union
+				//tables is not getting modified correctly, that is causing all the probs
+
+//Run the Queries
+        for (unsigned int i = 0; i < vecQueries.size(); i++)
 	{
 		vector<string> tempQ = vecQueries[i];
 
@@ -84,26 +95,22 @@ Database::Database(datalogProgram &datalog_program)
 /*
 Eval the first rule, if there is more than one, join the next with first.
 */
-set<Table> Database::evalRules(vector<rule> &rules)
+void Database::evalRules(rule &rule_, int &added)
 {
-    set<Table> ruleTables;
-    for(unsigned int i = 0; i < rules.size(); i++)
-    {
-        rule temp = rules[i];                                   //this is an individual rule. i.e rule(a,b):- la(n,b), na(a,c).
-        HeadPredicate tempHead = temp.getHead();
-        string newName = tempHead.getHeadId();                  //new name for the rel
-        vector<string> tempCols = tempHead.getColNames();       //columns of headPread i.e. new(a,b,c)
-        cout << temp.ruleToString();                        // this **PRINT** the cn(c,n):-snap(s,n,a,p), csg(c,s,g).
+        rule temp = rule_;                                   		//i.e cn(c,n):-snap(s,n,a,p), csg(c,s,g).
+        HeadPredicate tempHead = temp.getHead();                // i.e cn(c,n)
+        string newName = tempHead.getHeadId();                  // i.e cn
+        vector<string> tempCols = tempHead.getColNames();       // i.e. (c,n)
+        cout << temp.ruleToString();                            // this **PRINT** the cn(c,n):-snap(s,n,a,p), csg(c,s,g).
 
-        vector<Predicate> tempPreds = temp.getPred();
-        vector<pair<int,int>> matchingCols;
+        vector<Predicate> tempPreds = temp.getPred();           //gets (c,n) but in predicate form instead of string.
 
         Predicate firstPred = tempPreds[0];                     // first rel
         string firstName = firstPred.getPredId();               // name of rel
-        vector<string> firstQueries = firstPred.getQuery();     //query of rel
+        vector<string> firstQueries = firstPred.getQuery();     // query of rel
         Header firstHead = buildHeader(firstQueries);           // builds header from queries.
 
-        set<Table> firstRel = doRule(firstName, firstQueries);
+        set<Table> firstRel = doRule(firstName, firstQueries, tempCols);
         Table firstT = *firstRel.begin();                       //pulls first table its all you need.
 
         Header toProject;
@@ -113,7 +120,7 @@ set<Table> Database::evalRules(vector<rule> &rules)
             Predicate tPred = tempPreds[k];                     // first rel
             string tName = tPred.getPredId();                   // name of rel
             vector<string> tQueries = tPred.getQuery();         //query of rel
-            Table second = *doRule(tName, tQueries).begin();    //Table you will join
+            Table second = *doRule(tName, tQueries, tempCols).begin();    //Table you will join
 
             firstT = join(firstT, second, newName);             // join the first Table, with the next.
             toProject = firstT.getHeader();
@@ -122,33 +129,54 @@ set<Table> Database::evalRules(vector<rule> &rules)
 //project & rename
         vector<int> colsToProject = doProject(tempCols, toProject);             // get the colsToProject
         vector<string> colsToRename = getRuleRenames(tempCols, toProject);
+        //need to rearrange the header so it print appropriately, or print differently.
 
-        Table projectedRule = firstT.ruleProject(colsToProject);// project needed cols
+        Table projectedRule = firstT.ruleProject(colsToProject);            // project needed cols
         Table renamedRule = runRuleRename(colsToRename, projectedRule);
         printRules(renamedRule);
 
-        //tables.insert(renamedRule);
-
+//Union
+        Table newTable = unionTables(renamedRule); //returns the unioned Table
+				//added = newTable.size() -
 //print
-        cout << endl << "Schemes populated after " << " " <<" passes through the Rules.\n";
         set<vector<string>> thisStuff = firstT.getRows();
         set<vector<string>>::iterator printIt;
-
-       /* for(printIt = thisStuff.begin(); printIt != thisStuff.end(); printIt++)//print rows of rel
-        {
-            vector<string> row = *printIt;
-            cout << "new row: ";
-            for(auto a: row)
-            {
-                cout<< a << " ";
-            }
-            cout <<endl;
-        }*/
-    }
-    return ruleTables;
 }
 
-set<Table> Database::doRule(string name, vector<string> &queries)
+Table Database::unionTables(Table &newTs) //for each new relation that matches an old, add all the new rows to the old.
+{
+		Table unioned;
+    int added = 0;
+    set<Table>::iterator it;
+    set<vector<string>>::iterator it2;
+
+		//it = tables.find(Table(newTs.getName())); //find the iterator to the table that needs to change. modify this & return it
+
+		/*Header tHead= (*it).getHeader();
+		set<vector<string>> tRows = (*it).getRows();
+		set<vector<string>> tRows2 = newTs.getRows();
+
+		tRows.insert(tRows.begin(), tRows.end()); // insert all tables from newTs into tables.
+		string nName = newTs.getName();
+		unioned = Table(nName, tHead, tRows); //build new Table.
+		tables.erase(it);
+		tables.insert(unioned);*/
+
+    return unioned;
+}
+
+bool Database::addedRow(set<vector<string>> t1, vector<string> t2)
+{
+    set<vector<string>>::iterator it;
+    for(it = t1.begin(); it != t1.end(); it++)
+    {
+        vector<string> temp = *it;
+        if(temp == t2) return false; //if the row is already in there, ret false (dont add)
+    }
+    return true;
+}
+
+set<Table> Database::doRule(string name, vector<string> &queries, vector<string> &newPreds)
 {
     vector<pair<int, int>> matchPairs;
     vector<pair<int, string>> pairs;
@@ -167,12 +195,12 @@ set<Table> Database::doRule(string name, vector<string> &queries)
 vector<string> Database::getRuleRenames(vector<string> &tempCols, Header &tHeader)
 {
     vector<string> renames;
-    //cout << "tH size: " << tHeader.size() << endl;
-    for(auto a: tHeader)
+
+    for(unsigned int i = 0; i < tempCols.size(); i++) //for each tempCol
     {
-        for(unsigned int k = 0; k < tempCols.size(); k++)
+        for(unsigned int j = 0; j< tHeader.size(); j++) //for each header
         {
-            if(a == tempCols[k]) renames.push_back(tempCols[k]);
+            if(tempCols[i] == tHeader[j]) renames.push_back(tHeader[j]); //if the colToKeep matches the header, push_back the location of the header.
         }
     }
     return renames;
@@ -262,11 +290,6 @@ Header Database::getSchema(Table left, Table right, vector<pair<int,int>> &match
 
     //cout << "newSchema: ";
     Header newHeader = leftH;
-    /*for(auto a: newHeader) //print out
-    {
-        cout << a << " ";
-    }
-    cout <<endl;*/
 
     return newHeader;
 }
@@ -354,7 +377,7 @@ set<Table> Database::runRename(vector<string>& renames, set<Table>& projectedTab
 
 /*Pass in a Query. pass out Params.
  */
-void Database::generateParams(vector<vector<string>> &queries, vector<pair<int, int>> &matchPairs, vector<pair<int, string>> &pairs, 
+void Database::generateParams(vector<vector<string>> &queries, vector<pair<int, int>> &matchPairs, vector<pair<int, string>> &pairs,
 		vector<int> &projects, vector<string> &renames, vector<string> &tempQ)
 {
 	set<Table>::iterator headIt;
@@ -393,37 +416,25 @@ void Database::generateParams(vector<vector<string>> &queries, vector<pair<int, 
 }
 
 void Database::ruleParam(vector<pair<int, int>> &matchPairs, vector<pair<int, string>> &pairs,
-                         vector<int> &projects, vector<string> &renames, vector<string> &tempQ, string name) //RM all the +- 1 for header.
+                         vector<int> &projects, vector<string> &renames, vector<string> &tempQ, string name) //before join
 {
     set<Table>::iterator headIt;
     for (headIt = tables.begin(); headIt != tables.end(); ++headIt) //checking headers
     {
             Table tempTable = *headIt;
-            if (tempTable.getName() == name) //if table header matches header on Query then pull stuff from it.
+            if (tempTable.getName() == name)
             {
-                    //then check if matches, if not a string, check for matches.
                     for (unsigned int i = 0; i < tempQ.size(); i++)
                     {
                         //cout << "i: " << i <<endl << "tempQ: " << tempQ[i] << endl;
-                            if (tempQ[i].at(0) != '\'')
-                            {
+                        if(i == 0){ //if first time
+                                projects.push_back(i);
+                                renames.push_back(tempQ[i]);
+                        }
 
-                                    if(i == 0){
-                                            projects.push_back(i);
-                                            renames.push_back(tempQ[i]);
-                                            //cout << "renames has something : " << renames.size() << " passed this: " <<tempQ[i] <<endl;
-                                    }
-
-                                            bool add = true;
-                                            ruleGenHelper(tempQ, projects, add, renames, i); //fills projects, renames
-
-
-                                    ruleGenHelperSecond(tempQ, matchPairs, i); //fillsMatchPairs
-                            }
-                            else if (tempQ[i].at(0) == '\'') {
-                                    pairs.push_back(make_pair(i-1, tempQ[i]));
-                                    //cout << "pushBack \n";
-                            }
+                                bool add = true;
+                                ruleGenHelper(tempQ, projects, add, renames, i); //fills projects, renames
+                                ruleGenHelperSecond(tempQ, matchPairs, i); //fillsMatchPairs
                     }
             }
     }
@@ -448,12 +459,10 @@ void Database::ruleGenHelper(vector<string> &tempQ, vector<int> &projects, bool 
     {
             if(tempQ[projects[j]] == tempQ[i])
             {
-                //cout << "f\n";
                     add = false;
             }
     }
     if(add == true){
-        //cout << "t\n";
             projects.push_back(i);
             renames.push_back(tempQ[i]);
     }
@@ -582,7 +591,7 @@ void Database::print(set<Table> &renamedTable, vector<vector<string>> &vecQuerie
 	{
 		cout << "No" <<endl;
 	}
-	else 
+	else
 	{
 		if (renamedTable.size() > 0)
 		{
