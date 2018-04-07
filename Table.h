@@ -38,7 +38,7 @@ class Table
 				return name < rhs.name;
 			}
 
-		void addRow(const vector<string> &row);//need an add row function. addRow(Row row);
+		void addRow(vector<string> &row);//need an add row function. addRow(Row row);
 		void matchSelectHelper(int &matchFirst, int &matchSec, set<vector<string>> &tempRows) const; //fix complexity
 
 		string getName() const;

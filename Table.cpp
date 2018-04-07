@@ -14,7 +14,7 @@ Table::Table(Header header, string name, set<vector<string>> &rows)
 	this->rows = rows;
 }
 
-void Table::addRow(const vector<string> &row)
+void Table::addRow(vector<string> &row)
 {
 	rows.insert(row);
 }

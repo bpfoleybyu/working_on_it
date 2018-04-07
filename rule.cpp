@@ -51,7 +51,7 @@ string rule::toString()
 		ruleStr += ",";
 
 	}
-	ruleStr = ruleStr + "." + "\n";
+        ruleStr = ruleStr + "." + "\n";
 	return ruleStr;
 }
 
@@ -73,7 +73,7 @@ string rule::ruleToString()
                 ruleStr += ",";
 
         }
-        ruleStr = ruleStr + "." + "\n";
+        ruleStr = ruleStr + "\n";
         return ruleStr;
 }
 

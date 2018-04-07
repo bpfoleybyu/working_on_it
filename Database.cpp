@@ -28,6 +28,8 @@ steps for this
         ncg('Snoopy',Course,Grade)? Yes(1)
             Course='CS101', Grade='C'
 
+            ONLY PRINT THE ADDED ROWS, NOT ALL OF THEM
+
 
 */
 
@@ -38,25 +40,33 @@ Database::Database(datalogProgram &datalog_program)
 	set<vector<string>> headers = datalog_program.getHeader();
 	set<vector<string>> rows = datalog_program.getRows();
 	vector<vector<string>> vecQueries = datalog_program.getQueries();
-  vector<rule> rules = datalog_program.getRules(); //fill rules to eval later
+        vector<rule> rules = datalog_program.getRules();
 
         fillDatabase(headers, rows, vecQueries); //builds the tables.
 
-        cout << "Rule Evaluation \n";
-        int added =0;
+        cout << "Rule Evaluation\n";
+        bool runAgain = false;
+        int passes = 0;
+        int oldSize = 0;
+        int newSize =0;
+        int olderSize = 0;
+        Table printTable;
+        do {
+            olderSize = getSizeOfTables();
+            for(auto a: rules)
+            {
+                oldSize = getSizeOfTables();
+                printTable = evalRules(a, runAgain);
+                newSize = getSizeOfTables();
+                //cout << "old: " << oldSize << " new: " << newSize << " ";
+                if(oldSize != newSize) printRules(printTable);
+            }
+            passes++;
 
-				do {
-					for(auto a: rules) //for each rule, eval it
-					{
-						rule rule_ = a;
-						evalRules(rule_, added);
-					}
-				} while(added != 0);
+        } while(olderSize != newSize);
 
-        cout << endl << "Schemes populated after " << added <<" passes through the Rules.\n\n";
+        cout << endl << "Schemes populated after " << passes <<" passes through the Rules.\n\n";
         cout << "Query Evaluation" << endl;
-        //implement the union
-				//tables is not getting modified correctly, that is causing all the probs
 
 //Run the Queries
         for (unsigned int i = 0; i < vecQueries.size(); i++)
@@ -95,74 +105,103 @@ Database::Database(datalogProgram &datalog_program)
 /*
 Eval the first rule, if there is more than one, join the next with first.
 */
-void Database::evalRules(rule &rule_, int &added)
+Table Database::evalRules(rule &rule_, bool &runAgain)
 {
-        rule temp = rule_;                                   		//i.e cn(c,n):-snap(s,n,a,p), csg(c,s,g).
-        HeadPredicate tempHead = temp.getHead();                // i.e cn(c,n)
-        string newName = tempHead.getHeadId();                  // i.e cn
-        vector<string> tempCols = tempHead.getColNames();       // i.e. (c,n)
-        cout << temp.ruleToString();                            // this **PRINT** the cn(c,n):-snap(s,n,a,p), csg(c,s,g).
+        rule temp = rule_;                                          //i.e cn(c,n):-snap(s,n,a,p), csg(c,s,g).
+        HeadPredicate tempHead = temp.getHead();                    // i.e cn(c,n)
+        string newName = tempHead.getHeadId();                      // i.e cn
+        vector<string> tempCols = tempHead.getColNames();           // i.e. (c,n)
+        cout << temp.ruleToString();                                // this **PRINT** the cn(c,n):-snap(s,n,a,p), csg(c,s,g).
 
-        vector<Predicate> tempPreds = temp.getPred();           //gets (c,n) but in predicate form instead of string.
-
-        Predicate firstPred = tempPreds[0];                     // first rel
-        string firstName = firstPred.getPredId();               // name of rel
-        vector<string> firstQueries = firstPred.getQuery();     // query of rel
-        Header firstHead = buildHeader(firstQueries);           // builds header from queries.
+        vector<Predicate> tempPreds = temp.getPred();               //gets (c,n) but in predicate form instead of string.
+        Predicate firstPred = tempPreds[0];                         // first rel
+        string firstName = firstPred.getPredId();                   // name of rel
+        vector<string> firstQueries = firstPred.getQuery();         // query of rel
+        Header firstHead = buildHeader(firstQueries);               // builds header from queries.
 
         set<Table> firstRel = doRule(firstName, firstQueries, tempCols);
-        Table firstT = *firstRel.begin();                       //pulls first table its all you need.
+        Table firstT = *firstRel.begin();                           //pulls first table its all you need.
 
         Header toProject;
 //join
-        for(unsigned int k = 1; k < tempPreds.size(); k++)      // if more than one, keep joining it to first.
+        for(unsigned int k = 1; k < tempPreds.size(); k++)                      // if more than one, keep joining it to first.
         {
-            Predicate tPred = tempPreds[k];                     // first rel
-            string tName = tPred.getPredId();                   // name of rel
-            vector<string> tQueries = tPred.getQuery();         //query of rel
-            Table second = *doRule(tName, tQueries, tempCols).begin();    //Table you will join
+            //cout << "joining: \n";
+            Predicate tPred = tempPreds[k];                                     // first rel
+            string tName = tPred.getPredId();                                   // name of rel
+            vector<string> tQueries = tPred.getQuery();                         //query of rel
+            Table second = *doRule(tName, tQueries, tempCols).begin();          //Table you will join
 
-            firstT = join(firstT, second, newName);             // join the first Table, with the next.
+            firstT = join(firstT, second, newName);                             // join the first Table, with the next.
             toProject = firstT.getHeader();
         }
 
 //project & rename
+        if(tempPreds.size() == 1) toProject = firstT.getHeader();               //handles case of single rule
+
         vector<int> colsToProject = doProject(tempCols, toProject);             // get the colsToProject
-        vector<string> colsToRename = getRuleRenames(tempCols, toProject);
-        //need to rearrange the header so it print appropriately, or print differently.
+        Table projectedRule = firstT.ruleProject(colsToProject);                // project needed cols
+        //cout << "check p/r: \n";
+        //printRules(projectedRule);
+        //cout << endl;
 
-        Table projectedRule = firstT.ruleProject(colsToProject);            // project needed cols
-        Table renamedRule = runRuleRename(colsToRename, projectedRule);
-        printRules(renamedRule);
+        Table renamedRule = renameForUnion(projectedRule, newName);             //rename
 
-//Union
-        Table newTable = unionTables(renamedRule); //returns the unioned Table
-				//added = newTable.size() -
-//print
-        set<vector<string>> thisStuff = firstT.getRows();
-        set<vector<string>>::iterator printIt;
+
+
+//union
+        unionTables(renamedRule);
+//only print the rows that were not already there.
+        return renamedRule;
 }
 
-Table Database::unionTables(Table &newTs) //for each new relation that matches an old, add all the new rows to the old.
+void Database::unionTables(Table &newTs) //for each new relation that matches an old, add all the new rows to the old.
 {
-		Table unioned;
-    int added = 0;
-    set<Table>::iterator it;
-    set<vector<string>>::iterator it2;
+    string name = newTs.getName();
+    map<string, Table>::iterator mapIt;
 
-		//it = tables.find(Table(newTs.getName())); //find the iterator to the table that needs to change. modify this & return it
+    mapIt = mapOfTables.find(name);
 
-		/*Header tHead= (*it).getHeader();
-		set<vector<string>> tRows = (*it).getRows();
-		set<vector<string>> tRows2 = newTs.getRows();
+    vector<vector<string>> addedRows;
+    addAllRows(newTs, mapIt);
+}
 
-		tRows.insert(tRows.begin(), tRows.end()); // insert all tables from newTs into tables.
-		string nName = newTs.getName();
-		unioned = Table(nName, tHead, tRows); //build new Table.
-		tables.erase(it);
-		tables.insert(unioned);*/
+int Database::getSizeOfTables()
+{
+    int size;
+    for(auto a: mapOfTables) //for every Table, pull the row size and add it together.
+    {
+        size += a.second.getRows().size();
+    }
+    return size;
+}
 
-    return unioned;
+/*for the table that needs to be added too in tables, it adds the rows from the joined function.*/
+void Database::addAllRows(Table readyToUnionTable, map<string, Table>::iterator thisTableInTables)
+{
+        set<vector<string>> getRowsHere= readyToUnionTable.getRows();
+	for(auto a: getRowsHere)
+        {
+                (*thisTableInTables).second.addRow(a);
+	}
+
+}
+
+//find table in tables, rename accordingly
+Table Database::renameForUnion(Table &projectedTable, string name)
+{
+        map<string, Table>::iterator it;
+	Table renamed;
+
+        it = mapOfTables.find(name);
+        Table temp = (*it).second;
+        if(it != mapOfTables.end())
+        {
+            set<vector<string>> rows = projectedTable.getRows();
+            renamed = Table(temp.getHeader(), temp.getName(), rows);
+        }
+
+	return renamed;
 }
 
 bool Database::addedRow(set<vector<string>> t1, vector<string> t2)
@@ -200,7 +239,7 @@ vector<string> Database::getRuleRenames(vector<string> &tempCols, Header &tHeade
     {
         for(unsigned int j = 0; j< tHeader.size(); j++) //for each header
         {
-            if(tempCols[i] == tHeader[j]) renames.push_back(tHeader[j]); //if the colToKeep matches the header, push_back the location of the header.
+            if(tempCols[i] == tHeader[j]) renames.push_back(tHeader[j]); //if the colToKeep matches the header, push_back the string in header.
         }
     }
     return renames;
@@ -216,16 +255,6 @@ vector<int> Database::doProject(vector<string> &tempCols, Header &jHeader)
             if(tempCols[i] == jHeader[j]) projectCols.push_back(j); //if the colToKeep matches the header, push_back the location of the header.
         }
     }
-
-    /*cout << "proj cols size: " <<projectCols.size() << "***";
-    for(auto b: projectCols)
-    {
-        cout << " " << b;
-    }*/
-    //here sort projectCols
-    //print is not working because it is printing things in the wrong order, need to reorder the params, and the header accordingly.
-
-    //sort(projectCols.begin(), projectCols.end()); //need header to be reordered too if I do this.
     return projectCols;
 }
 
@@ -260,7 +289,8 @@ void Database::fillDatabase(set<vector<string>> &headers, set<vector<string>> &r
                     }
             }
             string tempName = name;
-            tables.insert(Table(tempH, tempName, tempRows));
+            Table newT = Table(tempH, tempName, tempRows);
+            mapOfTables.insert(pair<string, Table>(tempName, newT));
     }
 }
 
@@ -297,23 +327,18 @@ Header Database::getSchema(Table left, Table right, vector<pair<int,int>> &match
 set<Table> Database::runSelect(vector<pair<int, int>> &matchPairs, vector<pair<int, string>> &pairs, vector<string> tempQ)
 {
 	set<Table>tempTables;
-	set<Table>selectedTables;
-	set<Table>::iterator it;
-	set<Table>::iterator tempIt;
-	//set<Table>::iterator selectIt;
-	for (it = tables.begin(); it != tables.end(); it++)
-	{
-		if((*it).getName() == tempQ[0]){
-                    //cout << "running select \n";
-                        tempTables.insert((*it).matchSelect(matchPairs));
-			tempIt = tempTables.begin();
+        set<Table>selectedTables;
 
-			for (tempIt = tempTables.begin(); tempIt != tempTables.end(); tempIt++)
-			{
-				selectedTables.insert((*tempIt).select(pairs));
-			}
-		}
+        map<string, Table>::iterator it;
+        it = mapOfTables.find(tempQ[0]); //get the map w/ matching name.
+        Table tempTable = (*it).second;
+        tempTables.insert((tempTable).matchSelect(matchPairs)); //matchSel, then Sel
+
+        for(auto a: tempTables)
+        {
+            selectedTables.insert((a.select(pairs)));
         }
+
 
 	return selectedTables;
 }
@@ -322,20 +347,16 @@ set<Table> Database::runRuleSelect(vector<pair<int, int>> &matchPairs, vector<pa
 {
         set<Table>tempTables;
         set<Table>selectedTables;
-        set<Table>::iterator it;
-        set<Table>::iterator tempIt;
-        //set<Table>::iterator selectIt;
-        for (it = tables.begin(); it != tables.end(); it++)
-        {
-                if((*it).getName() == newName){
-                        tempTables.insert((*it).matchSelect(matchPairs));
-                        tempIt = tempTables.begin();
 
-                        for (tempIt = tempTables.begin(); tempIt != tempTables.end(); tempIt++)
-                        {
-                                selectedTables.insert((*tempIt).select(pairs));
-                        }
-                }
+        map<string, Table>::iterator mapIt;
+
+        mapIt= mapOfTables.find(newName); //get the map w/ matching name.
+        Table tempTable = (*mapIt).second;
+
+        tempTables.insert((tempTable).matchSelect(matchPairs)); //matchSel, then Sel
+        for(auto a: tempTables)
+        {
+            selectedTables.insert((a.select(pairs)));
         }
 
         return selectedTables;
@@ -380,63 +401,51 @@ set<Table> Database::runRename(vector<string>& renames, set<Table>& projectedTab
 void Database::generateParams(vector<vector<string>> &queries, vector<pair<int, int>> &matchPairs, vector<pair<int, string>> &pairs,
 		vector<int> &projects, vector<string> &renames, vector<string> &tempQ)
 {
-	set<Table>::iterator headIt;
-	for (headIt = tables.begin(); headIt != tables.end(); ++headIt) //checking headers
-	{
-		Table tempTable = *headIt;
-		if (tempTable.getName() == tempQ[0]) //if table header matches header on Query then pull stuff from it.
-		{
-			//then check if matches, if not a string, check for matches.
-                        for (unsigned int i = 1; i < tempQ.size(); i++) //ignore the first item of vector, as it is the header.
-			{
-                            //cout << "i: " << i <<endl << "tempQ: " << tempQ[i] << endl;
-				if (tempQ[i].at(0) != '\'')
-				{
 
-					if(i ==1){
-						projects.push_back(i - 1);
-						renames.push_back(tempQ[i]);
-                                                //cout << "renames has something : " << renames.size() << " passed this: " <<tempQ[i] <<endl;
-					}
+    Table tempTable = (*mapOfTables.find(tempQ[0])).second;
+    for (unsigned int i = 0; i < tempQ.size(); i++)
+    {
+        for (unsigned int i = 1; i < tempQ.size(); i++) //ignore the first item of vector, as it is the header.
+        {
+                if (tempQ[i].at(0) != '\'')
+                {
 
-					else{
-                                                bool add = true;
-                                                generatorHelper(tempQ, projects, add, renames, i); //fills projects, renames
-					}
+                        if(i ==1){
+                                projects.push_back(i - 1);
+                                renames.push_back(tempQ[i]);
+                        }
 
-                                        generatorHelperSecond(tempQ, matchPairs, i); //fillsMatchPairs
-				}
-				else if (tempQ[i].at(0) == '\'') {
-					pairs.push_back(make_pair(i-1, tempQ[i]));
-				}
-			}
-		}
-	}
-        //cout << "renames size: " << renames.size() << "\n";
+                        else{
+                                bool add = true;
+                                generatorHelper(tempQ, projects, add, renames, i); //fills projects, renames
+                        }
+
+                        generatorHelperSecond(tempQ, matchPairs, i); //fillsMatchPairs
+                }
+                else if (tempQ[i].at(0) == '\'') {
+                        pairs.push_back(make_pair(i-1, tempQ[i]));
+                }
+        }
+    }
 }
 
 void Database::ruleParam(vector<pair<int, int>> &matchPairs, vector<pair<int, string>> &pairs,
                          vector<int> &projects, vector<string> &renames, vector<string> &tempQ, string name) //before join
 {
-    set<Table>::iterator headIt;
-    for (headIt = tables.begin(); headIt != tables.end(); ++headIt) //checking headers
-    {
-            Table tempTable = *headIt;
-            if (tempTable.getName() == name)
-            {
-                    for (unsigned int i = 0; i < tempQ.size(); i++)
-                    {
-                        //cout << "i: " << i <<endl << "tempQ: " << tempQ[i] << endl;
-                        if(i == 0){ //if first time
-                                projects.push_back(i);
-                                renames.push_back(tempQ[i]);
-                        }
 
-                                bool add = true;
-                                ruleGenHelper(tempQ, projects, add, renames, i); //fills projects, renames
-                                ruleGenHelperSecond(tempQ, matchPairs, i); //fillsMatchPairs
-                    }
-            }
+    map<string, Table>::iterator it;
+    it =  mapOfTables.find(name);
+    Table tempTable = (*it).second;
+    for (unsigned int i = 0; i < tempQ.size(); i++)
+    {
+        if(i == 0){ //if first time
+                projects.push_back(i);
+                renames.push_back(tempQ[i]);
+        }
+
+                bool add = true;
+                ruleGenHelper(tempQ, projects, add, renames, i); //fills projects, renames
+                ruleGenHelperSecond(tempQ, matchPairs, i); //fillsMatchPairs
     }
 }
 
