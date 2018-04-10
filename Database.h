@@ -59,5 +59,6 @@ public:
 
 	void print(set<Table> &renamedTable, vector<vector<string>> &vecQueries, int j, bool printIt, bool var);
     void printRules(Table &renamedTable);
+    void printVecRules(Header printHeader, vector<string> printVec); //prints right after adding
 	~Database();
 };

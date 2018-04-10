@@ -47,23 +47,22 @@ Database::Database(datalogProgram &datalog_program)
         cout << "Rule Evaluation\n";
         bool runAgain = false;
         int passes = 0;
-        int oldSize = 0;
-        int newSize =0;
-        int olderSize = 0;
+        //int oldRuleSize = 0;
+        int newRulesSize =0;
+        int olderRulesSize = 0;
         Table printTable;
         do {
-            olderSize = getSizeOfTables();
+            olderRulesSize = getSizeOfTables();
             for(auto a: rules)
             {
-                oldSize = getSizeOfTables();
+                //oldRuleSize = getSizeOfTables();
                 printTable = evalRules(a, runAgain);
-                newSize = getSizeOfTables();
-                //cout << "old: " << oldSize << " new: " << newSize << " ";
-                if(oldSize != newSize) printRules(printTable);
+                newRulesSize = getSizeOfTables();
+                //if(oldRuleSize != newRulesSize) printRules(printTable);
             }
             passes++;
 
-        } while(olderSize != newSize);
+        } while(olderRulesSize != newRulesSize);
 
         cout << endl << "Schemes populated after " << passes <<" passes through the Rules.\n\n";
         cout << "Query Evaluation" << endl;
@@ -122,8 +121,8 @@ Table Database::evalRules(rule &rule_, bool &runAgain)
         set<Table> firstRel = doRule(firstName, firstQueries, tempCols);
         Table firstT = *firstRel.begin();                           //pulls first table its all you need.
 
-        Header toProject;
-//join
+
+//join- pull the first. join the second to it, update the first with that joined Rel, keep joining as needed.
         for(unsigned int k = 1; k < tempPreds.size(); k++)                      // if more than one, keep joining it to first.
         {
             //cout << "joining: \n";
@@ -133,21 +132,14 @@ Table Database::evalRules(rule &rule_, bool &runAgain)
             Table second = *doRule(tName, tQueries, tempCols).begin();          //Table you will join
 
             firstT = join(firstT, second, newName);                             // join the first Table, with the next.
-            toProject = firstT.getHeader();
         }
 
 //project & rename
-        if(tempPreds.size() == 1) toProject = firstT.getHeader();               //handles case of single rule
-
+        Header toProject = firstT.getHeader();
         vector<int> colsToProject = doProject(tempCols, toProject);             // get the colsToProject
         Table projectedRule = firstT.ruleProject(colsToProject);                // project needed cols
-        //cout << "check p/r: \n";
-        //printRules(projectedRule);
-        //cout << endl;
 
         Table renamedRule = renameForUnion(projectedRule, newName);             //rename
-
-
 
 //union
         unionTables(renamedRule);
@@ -158,12 +150,20 @@ Table Database::evalRules(rule &rule_, bool &runAgain)
 void Database::unionTables(Table &newTs) //for each new relation that matches an old, add all the new rows to the old.
 {
     string name = newTs.getName();
-    map<string, Table>::iterator mapIt;
+    map<string, Table>::iterator mapIt = mapOfTables.find(name);
 
-    mapIt = mapOfTables.find(name);
+    set<vector<string>> getRowsHere= newTs.getRows();
+    for(auto a: getRowsHere)
+    {
+        int size = (*mapIt).second.getRows().size();
+            (*mapIt).second.addRow(a);
+        int addedSize = (*mapIt).second.getRows().size();
 
-    vector<vector<string>> addedRows;
-    addAllRows(newTs, mapIt);
+        if(size != addedSize) // if you added something, print that thing.
+        {
+            printVecRules((*mapIt).second.getHeader(), a);
+        }
+    }
 }
 
 int Database::getSizeOfTables()
@@ -179,11 +179,13 @@ int Database::getSizeOfTables()
 /*for the table that needs to be added too in tables, it adds the rows from the joined function.*/
 void Database::addAllRows(Table readyToUnionTable, map<string, Table>::iterator thisTableInTables)
 {
+
         set<vector<string>> getRowsHere= readyToUnionTable.getRows();
 	for(auto a: getRowsHere)
         {
                 (*thisTableInTables).second.addRow(a);
-	}
+
+        }
 
 }
 
@@ -354,6 +356,7 @@ set<Table> Database::runRuleSelect(vector<pair<int, int>> &matchPairs, vector<pa
         Table tempTable = (*mapIt).second;
 
         tempTables.insert((tempTable).matchSelect(matchPairs)); //matchSel, then Sel
+
         for(auto a: tempTables)
         {
             selectedTables.insert((a.select(pairs)));
@@ -438,14 +441,22 @@ void Database::ruleParam(vector<pair<int, int>> &matchPairs, vector<pair<int, st
     Table tempTable = (*it).second;
     for (unsigned int i = 0; i < tempQ.size(); i++)
     {
-        if(i == 0){ //if first time
+        if(tempQ[i].at(0)!= '\'')
+        {
+            if(i == 0){ //if first time
                 projects.push_back(i);
                 renames.push_back(tempQ[i]);
-        }
+            }
 
                 bool add = true;
                 ruleGenHelper(tempQ, projects, add, renames, i); //fills projects, renames
                 ruleGenHelperSecond(tempQ, matchPairs, i); //fillsMatchPairs
+        }
+        else
+        {
+
+            pairs.push_back(make_pair(i, tempQ[i]));
+        }
     }
 }
 
@@ -562,7 +573,6 @@ Header Database::buildHeader(vector<string> strings)
 
 void Database::printRules(Table &renamedTable)
 {
-
     Header gotHeader = renamedTable.getHeader();
     set<vector<string>> gotRows = renamedTable.getRows();
     set<vector<string>>::iterator rowIt;
@@ -627,6 +637,19 @@ void Database::print(set<Table> &renamedTable, vector<vector<string>> &vecQuerie
 			}
 		}
 	}
+}
+
+void Database::printVecRules(Header printHeader, vector<string> printVec)
+{
+    int counter = 0;
+    cout << "  ";
+            for(unsigned int j = 0; j < printHeader.size(); j++)
+            {
+                if(counter > 0) cout << ", ";
+                cout << printHeader[j] << "=" << printVec[j];
+                counter++;
+            }
+            cout << endl;
 }
 
 void Database::printHelper(vector<string> &query)
