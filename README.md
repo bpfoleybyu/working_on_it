@@ -1,1 +1,1 @@
-# OptimizedRules, lab5 236
+#Finished Lab4 236, takes 41 seconds
