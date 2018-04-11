@@ -17,4 +17,6 @@ class Node
 		void setVisitedTrue();
 		void setSelfDependantTrue();
 		void insertDependant(int &toInsert);
+        bool getVisited() {return visited;}
+        bool getSelfDependant() {return selfDependant;}
 };

@@ -26,32 +26,21 @@ Database::Database(datalogProgram &datalog_program)
         fillDatabase(headers, rows, vecQueries); //builds the tables.
 
 //Rule Opt
-        map<int, Node> forwardGraph;
-        map<int, Node> reverseGraph;
-        fillGraphs(forwardGraph, reverseGraph, rules);
+        fillGraphs(rules);
+        printGraphs();
+        for(auto a: reverseGraph) //this will fill the stack for the first part
+        {
+            dfsReverse(a.first);
+        }
+        cout << "printing stack: ";
+        while(!postOrderStack.empty())
+        {
+            int a = postOrderStack.top();
+            cout << a << " ";
+            postOrderStack.pop();
+        }
+        cout << endl;
 
-        cout << "printing forward\n";
-        for(auto a: forwardGraph)
-        {
-            cout << "printing: " << a.first << ": ";
-            set<int> depends = a.second.dependants;
-            for(auto b:depends)
-            {
-                cout << b << " ";
-            }
-            cout <<endl;
-        }
-        cout << "printing reverse\n";
-        for(auto a: reverseGraph)
-        {
-            cout << "printing: " << a.first << ": ";
-            set<int> depends = a.second.dependants;
-            for(auto b:depends)
-            {
-                cout << b << " ";
-            }
-            cout <<endl;
-        }
 
 //evalRules
        /* cout << "Rule Evaluation\n";
@@ -611,11 +600,15 @@ void Database::printHelper(vector<string> &query)
 
 //FUNCTIONS FOR RULEOPT
 
-/*for each rule, check if the predicates headers match any of the following rules headers*/
-void Database::fillGraphs(map<int, Node>& forwardGraph, map<int, Node>& reverseGraph, vector<rule> &rules)
+/*for each rule, check if the predicates headers match any of the following rules headers
+if they match none, then insert an empty set?
+*/
+void Database::fillGraphs(vector<rule> &rules)
 {
     for(unsigned int i = 0; i < rules.size(); i++)
     {
+        //initializeGraphDependents for each graph (Needed so it prints properly).
+        forwardGraph[i];
         vector<Predicate> tempPreds = rules[i].getPred();
         for(unsigned int j = 0; j < tempPreds.size(); j++ )
         {
@@ -631,10 +624,68 @@ void Database::fillGraphs(map<int, Node>& forwardGraph, map<int, Node>& reverseG
                                 }
                             forwardGraph[i].dependants.insert(k);
                             reverseGraph[k].dependants.insert(i);
-
 			}
             }
         }
+    }
+}
+
+void Database::printGraphs()
+{
+    cout << "Dependency Graph\n";
+    int counter = 0;
+
+    for(auto a: forwardGraph)
+    {
+        bool addComma = false;
+        cout << "R" << counter << ":";
+        set<int> depends = a.second.dependants;
+        for(auto b:depends)
+        {
+            if(addComma == true) cout << ",";
+            cout << "R"<< b;
+            addComma = true;
+        }
+        cout <<endl;
+        counter++;
+    }
+
+    /*cout << "\nprinting reverse\n";
+    for(auto a: reverseGraph)
+    {
+        cout << "printing: " << a.first << ": ";
+        set<int> depends = a.second.dependants;
+        for(auto b:depends)
+        {
+            cout << b << " ";
+        }
+        cout <<endl;
+    }*/
+}
+
+void Database::dfsReverse(int node) //run the first dfs, ths runs on the reverse graph to fill stack
+{
+    if(!reverseGraph[node].getVisited())
+    {
+        reverseGraph[node].setVisitedTrue();
+        for(auto a: reverseGraph[node].dependants)
+        {
+            dfsReverse(a);
+        }
+        postOrderStack.push(node);
+    }
+}
+
+void Database::dfsForward(int node) //this runs off the order from the stack. fills the scc vec<set<int>>
+{
+    if(!reverseGraph[node].getVisited())
+    {
+        reverseGraph[node].setVisitedTrue();
+        for(auto a: reverseGraph[node].dependants)
+        {
+            dfsForward(a);
+        }
+
     }
 }
 

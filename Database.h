@@ -8,6 +8,7 @@
 #include "datalogProgram.h"
 #include <algorithm>
 #include "Node.h"
+#include <stack>
 
 
 using namespace std;
@@ -16,7 +17,11 @@ class Database
 {
 	private:
 		map<string, Table> mapOfTables;
-
+        map<int, Node> forwardGraph;
+        map<int, Node> reverseGraph;
+        stack<int> postOrderStack;
+        vector<set<int>> stronglyCC;
+        
 	public:
 		Database(datalogProgram &datalog_program);
 		void fillDatabase(set<vector<string>> &headers, set<vector<string>> &rows, vector<vector<string>> &vecQueries); //just to fix complexity in constructor.
@@ -60,9 +65,10 @@ class Database
 		void printVecRules(Header printHeader, vector<string> printVec); //prints right after adding
 
 		//ruleOpt functions
-		void fillGraphs(map<int, Node> &forwardGraph, map<int, Node>& reverseGraph, vector<rule>& rules); //fills the graphs
-		void dfsReverse(map<int, Node> &reverseGraph); //run the first dfs, ths runs on the reverse graph to fill stack
-		void dfsForward(map<int, Node> &forwardGraph); //runs off the input from the stack and the forward graph to fill SCC.
+		void fillGraphs(vector<rule>& rules); //fills the graphs
+		void dfsReverse(int node); //run the first dfs, ths runs on the reverse graph to fill stack
+		void dfsForward(stack<int>& order); //runs off the input from the stack and the forward graph to fill SCC.
+        void printGraphs(); //to check if filling correctly
 
 
 		~Database();
