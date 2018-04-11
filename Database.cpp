@@ -1,35 +1,16 @@
 #include "Database.h"
 
-
 /*
-Adding rule evaluation to the Lab
-steps for this
-    pull rules into a vector
-        for each rule, build relations on the right side, then join(if needed) to make the relation on the left.
-        get those relations by pulling the preds from the rule, then select, project, rename on it.
-        only once you have this can you run the queries.
+Adding rule optimizing to the lab
 
-        eval first rule, and for everyone after that, join it with r.
+1. Build the dependency graph.
+2. Build the reverse dependency graph. (same time as #1).
+3. Run DFS-Forest on the reverse dependency graph.
+4. Find the strongly connected components (SCCs).
+5. Evaluate the rules in each component.
 
-        Printing (from 1st example)
-        Rule Evalutaion
-        cn(c,n) :- snap(S,n,A,P),csg(c,S,G)
-            C='CS101', N='C. Brown'
-            C='CS101', N='P. Patty'
-        etc.
-
-        Schemes populated after _ passes through the Rules.
-
-        Query Evaluation
-        cn('CS101',Name)? Yes(3)
-            Name='C. Brown'
-            Name='P. Patty'
-            Name='Snoopy'
-        ncg('Snoopy',Course,Grade)? Yes(1)
-            Course='CS101', Grade='C'
-
-            ONLY PRINT THE ADDED ROWS, NOT ALL OF THEM
-
+Modifying The Database to evaluate the rules a little bit better.
+evaluate the rules based off of the
 
 */
 
@@ -37,17 +18,21 @@ steps for this
 /* this is what will fill up the set of tables, and also pull the queries to evaluate!*/
 Database::Database(datalogProgram &datalog_program)
 {
+//fillTables
 	set<vector<string>> headers = datalog_program.getHeader();
 	set<vector<string>> rows = datalog_program.getRows();
 	vector<vector<string>> vecQueries = datalog_program.getQueries();
         vector<rule> rules = datalog_program.getRules();
-
         fillDatabase(headers, rows, vecQueries); //builds the tables.
 
+//Rule Opt
+        map<int, Node> forwardGraph;
+        map<int, Node> reverseGraph;
+        fillGraphs(forwardsGraph, reverseGraph);
+
+//evalRules
         cout << "Rule Evaluation\n";
-        bool runAgain = false;
         int passes = 0;
-        //int oldRuleSize = 0;
         int newRulesSize =0;
         int olderRulesSize = 0;
         Table printTable;
@@ -55,10 +40,8 @@ Database::Database(datalogProgram &datalog_program)
             olderRulesSize = getSizeOfTables();
             for(auto a: rules)
             {
-                //oldRuleSize = getSizeOfTables();
-                printTable = evalRules(a, runAgain);
-                newRulesSize = getSizeOfTables();
-                //if(oldRuleSize != newRulesSize) printRules(printTable);
+                printTable = evalRules(a);
+                newRulesSize = getSizeOfTables(); 
             }
             passes++;
 
@@ -104,7 +87,7 @@ Database::Database(datalogProgram &datalog_program)
 /*
 Eval the first rule, if there is more than one, join the next with first.
 */
-Table Database::evalRules(rule &rule_, bool &runAgain)
+Table Database::evalRules(rule &rule_)
 {
         rule temp = rule_;                                          //i.e cn(c,n):-snap(s,n,a,p), csg(c,s,g).
         HeadPredicate tempHead = temp.getHead();                    // i.e cn(c,n)
@@ -138,7 +121,6 @@ Table Database::evalRules(rule &rule_, bool &runAgain)
         Header toProject = firstT.getHeader();
         vector<int> colsToProject = doProject(tempCols, toProject);             // get the colsToProject
         Table projectedRule = firstT.ruleProject(colsToProject);                // project needed cols
-
         Table renamedRule = renameForUnion(projectedRule, newName);             //rename
 
 //union
@@ -174,19 +156,6 @@ int Database::getSizeOfTables()
         size += a.second.getRows().size();
     }
     return size;
-}
-
-/*for the table that needs to be added too in tables, it adds the rows from the joined function.*/
-void Database::addAllRows(Table readyToUnionTable, map<string, Table>::iterator thisTableInTables)
-{
-
-        set<vector<string>> getRowsHere= readyToUnionTable.getRows();
-	for(auto a: getRowsHere)
-        {
-                (*thisTableInTables).second.addRow(a);
-
-        }
-
 }
 
 //find table in tables, rename accordingly
@@ -231,20 +200,6 @@ set<Table> Database::doRule(string name, vector<string> &queries, vector<string>
     set<Table> renamed = runRename(renames, projected);
 
     return renamed;
-}
-
-vector<string> Database::getRuleRenames(vector<string> &tempCols, Header &tHeader)
-{
-    vector<string> renames;
-
-    for(unsigned int i = 0; i < tempCols.size(); i++) //for each tempCol
-    {
-        for(unsigned int j = 0; j< tHeader.size(); j++) //for each header
-        {
-            if(tempCols[i] == tHeader[j]) renames.push_back(tHeader[j]); //if the colToKeep matches the header, push_back the string in header.
-        }
-    }
-    return renames;
 }
 
 vector<int> Database::doProject(vector<string> &tempCols, Header &jHeader)
@@ -300,7 +255,6 @@ Header Database::getSchema(Table left, Table right, vector<pair<int,int>> &match
 {
     Header leftH = left.getHeader();
     Header rightH = right.getHeader();
-    set<string> toAdd;
 
     for(unsigned int i = 0; i < rightH.size(); i++){ // if things match, add them to matchingCols
         for(unsigned int j = 0; j < leftH.size(); j++)
@@ -309,21 +263,17 @@ Header Database::getSchema(Table left, Table right, vector<pair<int,int>> &match
                 matchingCols.push_back(make_pair(j,i));
             }
         }
+
         Header::iterator p = find(leftH.begin(), leftH.end(), rightH[i]); // check for unique vals (Things to add)
-        if(p == leftH.end())
-        uniqueCols.push_back(i);
+        if(p == leftH.end()) uniqueCols.push_back(i);
     }
 
-    set<string>::iterator it;
     for(unsigned int i = 0; i < uniqueCols.size(); i++) //add ToAdd to the name
     {
         leftH.push_back(rightH[uniqueCols[i]]);
     }
 
-    //cout << "newSchema: ";
-    Header newHeader = leftH;
-
-    return newHeader;
+    return leftH;
 }
 
 set<Table> Database::runSelect(vector<pair<int, int>> &matchPairs, vector<pair<int, string>> &pairs, vector<string> tempQ)
@@ -363,11 +313,6 @@ set<Table> Database::runRuleSelect(vector<pair<int, int>> &matchPairs, vector<pa
         }
 
         return selectedTables;
-}
-
-Table Database::runRuleRename(vector<string> &renames, Table &projectedTable)
-{
-    return projectedTable.rename(renames);
 }
 
 set<Table> Database::runProject(vector<int>& projects, set<Table> &selectedTables)
@@ -512,25 +457,23 @@ Table Database::join(Table left, Table right, string newName)
     //join Name. take the whole L header, add to it anything from R that is different
     vector<pair<int,int>> matchingCols;
     vector<int> uniqueCols;
-    Header newHeader = getSchema(left, right, matchingCols, uniqueCols); //joins Rel name, and fills matchingCols
+    Header newHeader = getSchema(left, right, matchingCols, uniqueCols); //joins Rel name, and fills matchingCols and uniqueCols
 
     //join Rel
     set<vector<string>> rows;
     set<vector<string>> lRows = left.getRows();
     set<vector<string>> rRows = right.getRows();
-    set<vector<string>>::iterator Lit;
-    set<vector<string>>::iterator Rit;
     Table joined = Table(newHeader, newName, rows); // this creates a Table off of the first Scheme (left)
+
     //for each row in left, for each row in right, if they can join, join the rows. and add that row to joined.
-    for(Lit = lRows.begin(); Lit != lRows.end(); Lit++){
-        for(Rit = rRows.begin(); Rit != rRows.end(); Rit++)
+    for(set<vector<string>>::iterator Lit = lRows.begin(); Lit != lRows.end(); Lit++){
+        for(set<vector<string>>::iterator Rit = rRows.begin(); Rit != rRows.end(); Rit++)
         {
             vector<string> left = *Lit;
             vector<string> right = *Rit;
             if(joinable(left, right, matchingCols))
             {
-                vector<string> combinedRow = combineRows(left, right, uniqueCols); //join rows
-                joined.addRow(combinedRow); //add to relation.
+                joined.addRow(combineRows(left, right, uniqueCols)); //add to relation.
             }
         }
     }
@@ -571,29 +514,6 @@ Header Database::buildHeader(vector<string> strings)
     return head;
 }
 
-void Database::printRules(Table &renamedTable)
-{
-    Header gotHeader = renamedTable.getHeader();
-    set<vector<string>> gotRows = renamedTable.getRows();
-    set<vector<string>>::iterator rowIt;
-
-    for (rowIt = gotRows.begin(); rowIt != gotRows.end(); rowIt++)
-    {
-        vector<string> temp = *rowIt;
-        int counter = 0;
-        cout << "  ";
-        for (unsigned int i = 0; i < gotHeader.size(); i++)
-        {
-            if (counter > 0) {
-                cout << ", ";
-            }
-            cout << gotHeader[i] << "=" << temp[i];
-            counter++;
-        }
-        cout << endl;
-    }
-}
-
 void Database::print(set<Table> &renamedTable, vector<vector<string>> &vecQueries, int j, bool printIt, bool var)
 {
 	//example X(X,X)? Yes(2)
@@ -606,7 +526,7 @@ void Database::print(set<Table> &renamedTable, vector<vector<string>> &vecQuerie
 
         printHelper(query);
 
-	if (printIt == false /*|| (tableIt)->getName() != query[0]*/) //check if the table name matches, or if you previously said no.
+        if (printIt == false) //check if the table name matches, or if you previously said no.
 	{
 		cout << "No" <<endl;
 	}
@@ -661,6 +581,26 @@ void Database::printHelper(vector<string> &query)
             cout << query[i];
     }
     cout << ")? ";
+}
+
+
+//FUNCTIONS FOR RULEOPT
+void Database::fillGraphs(map<int, Node> &forwardGraph, map<int, Node> &reverseGraph, vector<rule> &rules)
+{
+    for(unsigned int i = 0; i < rules.size(); i++)
+    {
+        vector<Predicate> tempPreds = rules[i].getPred().getQuery();
+        for(unsigned int j = 0; j < tempPreds.size(); j++ )
+        {
+            for(unsigned int k = 0; k < rules.size(); k++)
+            {
+		string headId = rules[k].getHead().getHeadId();
+                if(tempPreds(j).getHead().getHeadId() == headId) //i depends on k.. & k depends on i
+                        if(i == headId) //then i depends on itself
+
+            }
+        }
+    }
 }
 
 Database::~Database()

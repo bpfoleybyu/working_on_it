@@ -1,23 +1,21 @@
 Schemes:
-  snap(S,N,A,P)
-  csg(C,S,G)
-  cn(C,N)
-  ncg(N,C,G)
+   cp(C,Q)
+   cdh(C,D,H)
+   cr(C,R)
+   before(C1,C2)
+   tthCourses(C)
 
+ 
 Facts:
-  snap('12345','C. Brown','12 Apple St.','555-1234').
-  snap('22222','P. Patty','56 Grape Blvd','555-9999').
-  snap('33333','Snoopy','12 Apple St.','555-1234').
-  csg('CS101','12345','A').
-  csg('CS101','22222','B').
-  csg('CS101','33333','C').
-  csg('EE200','12345','B+').
-  csg('EE200','22222','B').
-
+   cdh('CS101','Tu','10AM').
+   cdh('EE200','M','10AM').
+   cdh('EE200','W','1PM').
+   cdh('EE200','F','10AM').
+   cdh('PH100','Th','11AM').
+ 
 Rules:
-  cn(c,n) :- snap(S,n,A,P),csg(c,S,G).
-  ncg(n,c,g) :- snap(S,n,A,P),csg(c,S,g).
+   tthCourses(C) :- cdh(C,'Tu',H).
 
 Queries:
-  cn('CS101',Name)?
-  ncg('Snoopy',Course,Grade)?
+   cdh('EE200',Day,Hour)?
+
