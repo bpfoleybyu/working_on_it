@@ -592,6 +592,7 @@ void Database::fillGraphs(map<int, Node> &forwardGraph, map<int, Node> &reverseG
         vector<Predicate> tempPreds = rules[i].getPred().getQuery();
         for(unsigned int j = 0; j < tempPreds.size(); j++ )
         {
+		
             for(unsigned int k = 0; k < rules.size(); k++)
             {
 		string headId = rules[k].getHead().getHeadId();
