@@ -1,21 +1,21 @@
-Schemes:
-   cp(C,Q)
-   cdh(C,D,H)
-   cr(C,R)
-   before(C1,C2)
-   tthCourses(C)
 
- 
+
+Schemes:
+Parent(p,c)
+Sibling(a,b)
+Ancestor(x,y)
+
 Facts:
-   cdh('CS101','Tu','10AM').
-   cdh('EE200','M','10AM').
-   cdh('EE200','W','1PM').
-   cdh('EE200','F','10AM').
-   cdh('PH100','Th','11AM').
- 
+Parent('bob','ned').
+Parent('jim','bob').
+Sibling('sue','ned').
+
 Rules:
-   tthCourses(C) :- cdh(C,'Tu',H).
+Sibling(x,y):-Sibling(y,x).
+Ancestor(x,y):-Ancestor(x,z),Parent(z,y).
+Ancestor(x,y):-Parent(x,y).
 
 Queries:
-   cdh('EE200',Day,Hour)?
+Ancestor(x,'ned')?
+Sibling('ned','sue')?
 

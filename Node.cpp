@@ -18,7 +18,7 @@ void Node::setSelfDependantTrue()
 
 void Node::insertDependant(int &toInsert)
 {
-	dependants.insert(insert);
+        dependants.insert(toInsert);
 }
 
 Node::~Node()

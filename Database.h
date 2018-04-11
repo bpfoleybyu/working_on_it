@@ -38,7 +38,7 @@ class Database
 
 		Header getSchema(Table left, Table right, vector<pair<int,int>> &matchingCols, vector<int> &uniqueCols);
 		Table join(Table left, Table right, string newName); // 1. join header 2. test 3. join
-		vector<string> combineRows(vector<string> &left, vector<string> &right, vector<int> &uniqueCols); //joins the rows.
+                vector<string> combineRows(vector<string> &left, vector<string> &right, vector<int> &uniqueCols); //joins the rows.
 
 		bool joinable(vector<string> &left, vector<string> &right, vector<pair<int, int>> &matchPairs); //returns true if you should join it
 		void generateParams(vector<vector<string>> &queries, vector<pair<int, int>> &matchPairs,
@@ -60,7 +60,7 @@ class Database
 		void printVecRules(Header printHeader, vector<string> printVec); //prints right after adding
 
 		//ruleOpt functions
-		void fillGraphs(map<int, Node> &forwardGraph, map<int, Node> &reverseGraph, vector<rule> &rules); //fills the graphs
+		void fillGraphs(map<int, Node> &forwardGraph, map<int, Node>& reverseGraph, vector<rule>& rules); //fills the graphs
 		void dfsReverse(map<int, Node> &reverseGraph); //run the first dfs, ths runs on the reverse graph to fill stack
 		void dfsForward(map<int, Node> &forwardGraph); //runs off the input from the stack and the forward graph to fill SCC.
 

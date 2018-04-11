@@ -6,12 +6,14 @@ using namespace std;
 class Node
 {
 	private:
-		Node();
 		bool visited;
 		bool selfDependant;
-		set<int> dependants;
+
 	public:
-		~Node();
+		Node();
+        ~Node();
+        
+        set<int> dependants;
 		void setVisitedTrue();
 		void setSelfDependantTrue();
 		void insertDependant(int &toInsert);

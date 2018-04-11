@@ -28,10 +28,33 @@ Database::Database(datalogProgram &datalog_program)
 //Rule Opt
         map<int, Node> forwardGraph;
         map<int, Node> reverseGraph;
-        fillGraphs(forwardsGraph, reverseGraph);
+        fillGraphs(forwardGraph, reverseGraph, rules);
+
+        cout << "printing forward\n";
+        for(auto a: forwardGraph)
+        {
+            cout << "printing: " << a.first << ": ";
+            set<int> depends = a.second.dependants;
+            for(auto b:depends)
+            {
+                cout << b << " ";
+            }
+            cout <<endl;
+        }
+        cout << "printing reverse\n";
+        for(auto a: reverseGraph)
+        {
+            cout << "printing: " << a.first << ": ";
+            set<int> depends = a.second.dependants;
+            for(auto b:depends)
+            {
+                cout << b << " ";
+            }
+            cout <<endl;
+        }
 
 //evalRules
-        cout << "Rule Evaluation\n";
+       /* cout << "Rule Evaluation\n";
         int passes = 0;
         int newRulesSize =0;
         int olderRulesSize = 0;
@@ -48,7 +71,7 @@ Database::Database(datalogProgram &datalog_program)
         } while(olderRulesSize != newRulesSize);
 
         cout << endl << "Schemes populated after " << passes <<" passes through the Rules.\n\n";
-        cout << "Query Evaluation" << endl;
+        cout << "Query Evaluation" << endl;*/
 
 //Run the Queries
         for (unsigned int i = 0; i < vecQueries.size(); i++)
@@ -66,7 +89,7 @@ Database::Database(datalogProgram &datalog_program)
 		set<Table> renamedTable = runRename(renames, projectedTable); //rename
 
 		//then print here, will be easier then trying to iterate through again at the end
-		bool printIt = true;
+                bool printIt = true;
 		set<Table>::iterator tempIt;
 		tempIt = selectedTable.begin();
 		set<vector<string>> tempRows = tempIt->getRows(); //check if any matches (by what was selected
@@ -74,14 +97,15 @@ Database::Database(datalogProgram &datalog_program)
 		{
 			printIt = false;
 		}
-		bool var = true;
+                bool var = true;
 
 		if (renames.size() == 0)
 		{
 			var = false;
                         //cout << "\n **** \n";
 		}
-		print(renamedTable, vecQueries, i, printIt, var);
+                if(printIt == var) cout << "";
+                //print(renamedTable, vecQueries, i, printIt, var);
         }
 }
 /*
@@ -473,7 +497,8 @@ Table Database::join(Table left, Table right, string newName)
             vector<string> right = *Rit;
             if(joinable(left, right, matchingCols))
             {
-                joined.addRow(combineRows(left, right, uniqueCols)); //add to relation.
+                vector<string> toAdd = combineRows(left, right, uniqueCols);
+                joined.addRow(toAdd); //add to relation.
             }
         }
     }
@@ -585,20 +610,29 @@ void Database::printHelper(vector<string> &query)
 
 
 //FUNCTIONS FOR RULEOPT
-void Database::fillGraphs(map<int, Node> &forwardGraph, map<int, Node> &reverseGraph, vector<rule> &rules)
+
+/*for each rule, check if the predicates headers match any of the following rules headers*/
+void Database::fillGraphs(map<int, Node>& forwardGraph, map<int, Node>& reverseGraph, vector<rule> &rules)
 {
     for(unsigned int i = 0; i < rules.size(); i++)
     {
-        vector<Predicate> tempPreds = rules[i].getPred().getQuery();
+        vector<Predicate> tempPreds = rules[i].getPred();
         for(unsigned int j = 0; j < tempPreds.size(); j++ )
         {
-		
             for(unsigned int k = 0; k < rules.size(); k++)
             {
 		string headId = rules[k].getHead().getHeadId();
-                if(tempPreds(j).getHead().getHeadId() == headId) //i depends on k.. & k depends on i
-                        if(i == headId) //then i depends on itself
+                if(tempPreds[j].getPredId() == headId) //i depends on k.. & k depends on i
+			{
+                           if(rules[i].getHead().getHeadId() == headId) //then i depends on itself
+                                {
+                                    forwardGraph[i].setSelfDependantTrue();
+                                    reverseGraph[j].setSelfDependantTrue();
+                                }
+                            forwardGraph[i].dependants.insert(k);
+                            reverseGraph[k].dependants.insert(i);
 
+			}
             }
         }
     }
