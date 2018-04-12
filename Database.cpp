@@ -31,18 +31,7 @@ Database::Database(datalogProgram &datalog_program)
         fillGraphs(rules);
         printGraphs();
         fillStack();
-        //check Stack
-       /* stack<int> temp = postOrderStack;
-        cout << "check stack\n";
-        while(!temp.empty())
-        {
-            int a = temp.top();
-            cout << a << " ";
-            temp.pop();
-        }*/
         fillSCC();
-
-//evalRulesOffOfSCC
         runOptRules(rules);
 
 //Run the Queries
@@ -620,30 +609,20 @@ void Database::printGraphs()
 
     for(auto a: forwardGraph)
     {
-        bool addComma = false;
         cout << "R" << counter << ":";
         set<int> depends = a.second.dependants;
+        int comma = 0;
         for(auto b:depends)
         {
-            if(addComma == true) cout << ",";
+            if(comma >0) cout << ",";
             cout << "R"<< b;
-            addComma = true;
+            comma++;
         }
         cout <<endl;
         counter++;
     }
     cout << endl;
-    /*cout << "\nprinting reverse\n";
-    for(auto a: reverseGraph)
-    {
-        cout << "printing: " << a.first << ": ";
-        set<int> depends = a.second.dependants;
-        for(auto b:depends)
-        {
-            cout << b << " ";
-        }
-        cout <<endl;
-    }*/
+
 }
 
 void Database::fillStack()
@@ -656,12 +635,14 @@ void Database::fillStack()
 
 void Database::fillSCC()
 {
+    //cout << "fGraph size: "<<forwardGraph.size()<<endl;
     while(!postOrderStack.empty())
     {
         dfsSet.clear(); //empties the data member
         int a = postOrderStack.top();
         dfsForward(a);
         postOrderStack.pop();
+        if(dfsSet.size() != 0) scc.push_back (dfsSet); // push to SCC
     }
 }
 
@@ -682,14 +663,16 @@ void Database::dfsForward(int node) //this runs off the order from the stack. fi
 {
     if(!forwardGraph[node].getVisited())
     {
-        dfsSet.insert(node);
+
         forwardGraph[node].setVisitedTrue();
 
         for(auto a: forwardGraph[node].dependants)
         {
             dfsForward(a);
+
         }
-            scc.push_back (dfsSet); // push to SCC
+        dfsSet.insert(node);
+        //scc.push_back (dfsSet); // push to SCC
     }
 }
 
@@ -720,28 +703,34 @@ void Database::runOptRules(vector<rule>& rules)
             passes++;
         }
 
-        else                                        //run the do while.
+        else
             {
-            do {
-                setAddedFalse();
-                for(auto b: temp)
-                {
-                    evalRules(rules[b]);
-                }
-                passes++;
-            } while(getAdded() == true);
+            runDoWhile(temp, rules, passes);
         }
 
         cout << passes << " passes: ";
+        int comma = 0;
         for(auto b: temp)
         {
-            if(checker != 0) cout << ",";
+            if(comma != 0) cout << ",";
             cout << "R"<<b;
-            checker++;
+            comma++;
         }
         cout<<endl;
         counter++;
     }
+}
+
+void Database::runDoWhile(set<int> &temp, vector<rule> &rules, int &passes)
+{
+    do {
+        setAddedFalse();
+        for(auto b: temp)
+        {
+            evalRules(rules[b]);
+        }
+        passes++;
+    } while(getAdded() == true);
 }
 
 Database::~Database()

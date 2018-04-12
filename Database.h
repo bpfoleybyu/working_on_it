@@ -77,5 +77,6 @@ class Database
         void setAddedTrue() {added = true;}
         void runOptRules(vector<rule>& rules);
         bool getAdded() {return added;}
+        void runDoWhile(set<int> &temp, vector<rule> &rules, int &passes);
 		~Database();
 };
