@@ -30,14 +30,14 @@ Database::Database(datalogProgram &datalog_program)
         printGraphs();
         fillStack();
         //check Stack
-        stack<int> temp = postOrderStack;
+       /* stack<int> temp = postOrderStack;
         cout << "check stack\n";
         while(!temp.empty())
         {
             int a = temp.top();
             cout << a << " ";
             temp.pop();
-        }
+        }*/
         fillSCC();
 
 //evalRulesOffOfSCC
@@ -589,6 +589,7 @@ void Database::fillGraphs(vector<rule> &rules)
     {
         //initializeGraphDependents for each graph (Needed so it prints properly).
         forwardGraph[i];
+        reverseGraph[i];
         vector<Predicate> tempPreds = rules[i].getPred();
         for(unsigned int j = 0; j < tempPreds.size(); j++ )
         {
@@ -700,7 +701,15 @@ void Database::runOptRules(vector<rule>& rules)
         int whichRule = 0;
         set<int> temp = a;
         whichRule = *(temp.begin());
-        cout << "SCC: R" << whichRule << endl;
+        cout << "SCC: ";
+        int checker = 0;
+            for(auto b: temp)
+            {
+                if(checker != 0) cout << ",";
+                cout << "R"<<b;
+                checker++;
+            }
+             cout << endl;
 
         bool selfDependant = forwardGraph[whichRule].getSelfDependant();
         if(temp.size() == 1 && selfDependant == false)       //only run once.
@@ -721,7 +730,14 @@ void Database::runOptRules(vector<rule>& rules)
             } while(getAdded() == true);
         }
 
-        cout << passes << " passes: " << "R"<<(*(temp.begin()))<<endl;
+        cout << passes << " passes: ";
+        for(auto b: temp)
+        {
+            if(checker != 0) cout << ",";
+            cout << "R"<<b;
+            checker++;
+        }
+        cout<<endl;
         counter++;
     }
 }
