@@ -20,7 +20,9 @@ class Database
         map<int, Node> forwardGraph;
         map<int, Node> reverseGraph;
         stack<int> postOrderStack;
-        vector<set<int>> stronglyCC;
+        vector<set<int>> scc;
+        set<int> dfsSet;
+        bool added;
         
 	public:
 		Database(datalogProgram &datalog_program);
@@ -36,7 +38,7 @@ class Database
 		Table renameForUnion(Table &projectedTable, string name);
 
 		set<Table> runRename(vector<string> &renames, set<Table> &projectedTables);
-		Table evalRules(rule &rule_); //this builds a relation for each rule on the rhs. preps them to be joined.
+		void evalRules(rule &rule_); //this builds a relation for each rule on the rhs. preps them to be joined.
 		vector<int> doProject(vector<string> &tempCols, Header &jHeader); //sets up projects, in a set to maintain order!
 
 		set<Table> doRule(string name, vector<string> &queries, vector<string> &newPreds); // does all of the work for the first rule
@@ -67,9 +69,13 @@ class Database
 		//ruleOpt functions
 		void fillGraphs(vector<rule>& rules); //fills the graphs
 		void dfsReverse(int node); //run the first dfs, ths runs on the reverse graph to fill stack
-		void dfsForward(stack<int>& order); //runs off the input from the stack and the forward graph to fill SCC.
+		void dfsForward(int node); //runs off the input from the stack and the forward graph to fill SCC.
         void printGraphs(); //to check if filling correctly
-
-
+        void fillStack(); //runs dfsReverse
+        void fillSCC(); //runs dfsForward
+        void setAddedFalse() {added = false;}
+        void setAddedTrue() {added = true;}
+        void runOptRules(vector<rule>& rules);
+        bool getAdded() {return added;}
 		~Database();
 };

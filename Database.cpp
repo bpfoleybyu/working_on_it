@@ -28,41 +28,23 @@ Database::Database(datalogProgram &datalog_program)
 //Rule Opt
         fillGraphs(rules);
         printGraphs();
-        for(auto a: reverseGraph) //this will fill the stack for the first part
+        fillStack();
+        //check Stack
+        stack<int> temp = postOrderStack;
+        cout << "check stack\n";
+        while(!temp.empty())
         {
-            dfsReverse(a.first);
-        }
-        cout << "printing stack: ";
-        while(!postOrderStack.empty())
-        {
-            int a = postOrderStack.top();
+            int a = temp.top();
             cout << a << " ";
-            postOrderStack.pop();
+            temp.pop();
         }
-        cout << endl;
+        fillSCC();
 
-
-//evalRules
-       /* cout << "Rule Evaluation\n";
-        int passes = 0;
-        int newRulesSize =0;
-        int olderRulesSize = 0;
-        Table printTable;
-        do {
-            olderRulesSize = getSizeOfTables();
-            for(auto a: rules)
-            {
-                printTable = evalRules(a);
-                newRulesSize = getSizeOfTables(); 
-            }
-            passes++;
-
-        } while(olderRulesSize != newRulesSize);
-
-        cout << endl << "Schemes populated after " << passes <<" passes through the Rules.\n\n";
-        cout << "Query Evaluation" << endl;*/
+//evalRulesOffOfSCC
+        runOptRules(rules);
 
 //Run the Queries
+        cout << "\nQuery Evaluation\n";
         for (unsigned int i = 0; i < vecQueries.size(); i++)
 	{
 		vector<string> tempQ = vecQueries[i];
@@ -94,13 +76,13 @@ Database::Database(datalogProgram &datalog_program)
                         //cout << "\n **** \n";
 		}
                 if(printIt == var) cout << "";
-                //print(renamedTable, vecQueries, i, printIt, var);
+                print(renamedTable, vecQueries, i, printIt, var);
         }
 }
 /*
 Eval the first rule, if there is more than one, join the next with first.
 */
-Table Database::evalRules(rule &rule_)
+void Database::evalRules(rule &rule_)
 {
         rule temp = rule_;                                          //i.e cn(c,n):-snap(s,n,a,p), csg(c,s,g).
         HeadPredicate tempHead = temp.getHead();                    // i.e cn(c,n)
@@ -121,7 +103,6 @@ Table Database::evalRules(rule &rule_)
 //join- pull the first. join the second to it, update the first with that joined Rel, keep joining as needed.
         for(unsigned int k = 1; k < tempPreds.size(); k++)                      // if more than one, keep joining it to first.
         {
-            //cout << "joining: \n";
             Predicate tPred = tempPreds[k];                                     // first rel
             string tName = tPred.getPredId();                                   // name of rel
             vector<string> tQueries = tPred.getQuery();                         //query of rel
@@ -138,8 +119,6 @@ Table Database::evalRules(rule &rule_)
 
 //union
         unionTables(renamedRule);
-//only print the rows that were not already there.
-        return renamedRule;
 }
 
 void Database::unionTables(Table &newTs) //for each new relation that matches an old, add all the new rows to the old.
@@ -156,6 +135,7 @@ void Database::unionTables(Table &newTs) //for each new relation that matches an
 
         if(size != addedSize) // if you added something, print that thing.
         {
+            setAddedTrue();
             printVecRules((*mapIt).second.getHeader(), a);
         }
     }
@@ -649,7 +629,7 @@ void Database::printGraphs()
         cout <<endl;
         counter++;
     }
-
+    cout << endl;
     /*cout << "\nprinting reverse\n";
     for(auto a: reverseGraph)
     {
@@ -661,6 +641,25 @@ void Database::printGraphs()
         }
         cout <<endl;
     }*/
+}
+
+void Database::fillStack()
+{
+    for(auto a: reverseGraph) //this will fill the stack for the first part
+    {
+        dfsReverse(a.first);
+    }
+}
+
+void Database::fillSCC()
+{
+    while(!postOrderStack.empty())
+    {
+        dfsSet.clear(); //empties the data member
+        int a = postOrderStack.top();
+        dfsForward(a);
+        postOrderStack.pop();
+    }
 }
 
 void Database::dfsReverse(int node) //run the first dfs, ths runs on the reverse graph to fill stack
@@ -678,14 +677,52 @@ void Database::dfsReverse(int node) //run the first dfs, ths runs on the reverse
 
 void Database::dfsForward(int node) //this runs off the order from the stack. fills the scc vec<set<int>>
 {
-    if(!reverseGraph[node].getVisited())
+    if(!forwardGraph[node].getVisited())
     {
-        reverseGraph[node].setVisitedTrue();
-        for(auto a: reverseGraph[node].dependants)
+        dfsSet.insert(node);
+        forwardGraph[node].setVisitedTrue();
+
+        for(auto a: forwardGraph[node].dependants)
         {
             dfsForward(a);
         }
+            scc.push_back (dfsSet); // push to SCC
+    }
+}
 
+void Database::runOptRules(vector<rule>& rules)
+{
+    int counter = 0;
+    cout << "Rule Evaluation\n";
+    for(auto a: scc)
+    {
+        int passes = 0;
+        int whichRule = 0;
+        set<int> temp = a;
+        whichRule = *(temp.begin());
+        cout << "SCC: R" << whichRule << endl;
+
+        bool selfDependant = forwardGraph[whichRule].getSelfDependant();
+        if(temp.size() == 1 && selfDependant == false)       //only run once.
+        {
+            evalRules(rules[whichRule]);
+            passes++;
+        }
+
+        else                                        //run the do while.
+            {
+            do {
+                setAddedFalse();
+                for(auto b: temp)
+                {
+                    evalRules(rules[b]);
+                }
+                passes++;
+            } while(getAdded() == true);
+        }
+
+        cout << passes << " passes: " << "R"<<(*(temp.begin()))<<endl;
+        counter++;
     }
 }
 
