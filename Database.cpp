@@ -14,6 +14,8 @@ evaluate the rules based off of the
 
 */
 
+//HANDLE BACKWARDS EDGES!!!
+
 
 /* this is what will fill up the set of tables, and also pull the queries to evaluate!*/
 Database::Database(datalogProgram &datalog_program)
